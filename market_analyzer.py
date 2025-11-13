@@ -303,7 +303,8 @@ def main():
     data_message = ("\n\n" + "-" * 35 + "\n\n").join(filter(None, full_message_blocks))
     send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, data_message)
 
-    display_analysis_html = get_gem
+    # --- دریافت متن و سپس تولید صوت ---
+    display_analysis_html = get_gemini_analysis_text(last_row, previous_row, df)
     
     if display_analysis_html:
         ai_message = display_analysis_html + "\n\n" + "\n".join([f"<i>این تحلیل توسط هوش مصنوعی (Google Gemini) تولید شده است.</i>", "🆔 @Data_Bors"])
@@ -322,4 +323,4 @@ def main():
     print(f"\n--- عملیات با موفقیت به پایان رسید. ---")
 
 if __name__ == "__main__":
-    main()
+    main(

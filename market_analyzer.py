@@ -35,7 +35,100 @@ else:
 def reshape_text(text):
     return get_display(arabic_reshaper.reshape(str(text)))
 
-# ... (تمام توابع parse, proximity, moving_average, gauge ... بدون تغییر)
+def send_photo_to_telegram(token, chat_id, photo_path, caption=""):
+    print("\nدر حال ارسال عکس به تلگرام...")
+    if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
+    api_url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    try:
+        with open(photo_path, 'rb') as photo_file:
+            response = requests.post(api_url, data={'chat_id': chat_id, 'caption': caption, 'parse_mode': 'HTML'},
+                                     files={'photo': photo_file}, timeout=30)
+            response.raise_for_status()
+            if response.json().get("ok"): print("✅ عکس با موفقیت به تلگرام ارسال شد.")
+            else: print(f"❌ خطا در ارسال عکس: {response.text}")
+    except Exception as e: print(f"خطا در فرآیند ارسال عکس: {e}")
+
+def send_message_to_telegram(token, chat_id, text):
+    print("در حال ارسال پیام متنی به تلگرام...")
+    if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
+    api_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
+    try:
+        response = requests.post(api_url, json=payload, timeout=20)
+        response.raise_for_status()
+        if response.json().get("ok"): print("✅ پیام متنی با موفقیت ارسال شد.")
+        else: print(f"❌ خطا در ارسال پیام متنی از تلگرام: {response.text}")
+    except Exception as e: print(f"خطا در فرآیند ارسال پیام متنی: {e}")
+
+def get_gemini_analysis_text(last_row, previous_row, df):
+    """فقط تحلیل متنی را از Gemini دریافت می‌کند."""
+    print("\nدر حال دریافت تحلیل متنی از Gemini...")
+    if not GEMINI_API_KEY: return None
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        
+        prompt = f"""
+        شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. داده‌های زیر را تحلیل کرده و یک گزارش حرفه‌ای برای نمایش در تلگرام آماده کن.
+        **دستورالعمل‌های بسیار مهم برای فرمت:**
+        1.  فقط و فقط از تگ‌های <b>...</b>, <i>...</i>, <code>...</code> استفاده کن.
+        2.  هرگز تگ‌ها را به صورت تودرتو استفاده نکن. مثال اشتباه: <b><i>text</i></b>. مثال صحیح: <b>text</b> یا <i>text</i>.
+        3.  مطمئن شو که تمام تگ‌های باز شده، به درستی بسته شده‌اند (مثلاً <b>text</b>).
+        4.  از کاراکترهای خاص HTML مانند '<' یا '>' در متن عادی (خارج از تگ‌ها) به هیچ وجه استفاده نکن.
+
+        **داده‌های کلیدی:**
+        - تاریخ: {last_row['تاریخ']}
+        - ارزش معاملات: {last_row['ارزش معاملات']:,.1f} میلیارد تومان
+        - شاخص کل: {last_row['شاخص کل']:,.0f} (تغییر: {last_row['شاخص کل'] - previous_row['شاخص کل']:+,.0f})
+        - ورود پول: {last_row['ورود پول']:,.1f} میلیارد تومان
+        - قدرت خریدار: {last_row['قدرت خريد']:.2f}
+        """
+        response = model.generate_content(prompt)
+        print("✅ تحلیل متنی با موفقیت دریافت شد.")
+        return response.text.strip()
+            
+    except Exception as e:
+        print(f"❌ خطا در دریافت تحلیل متنی از Gemini: {e}")
+        return None
+
+def convert_text_to_speech_gemini(text, filename="analysis_audio.mp3"):
+    """متن را با استفاده از مدل TTS داخلی Gemini به صوت تبدیل می‌کند."""
+    print("در حال تبدیل متن به صوت با استفاده از Gemini TTS...")
+    if not GEMINI_API_KEY: return None
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        # این مدل جدیدتر است و مستقیماً از generate_content استفاده می‌کند
+        tts_model = genai.GenerativeModel(model_name='models/text-to-speech') 
+        
+        # --- روش صحیح فراخوانی API با کتابخانه آپدیت شده ---
+        response = tts_model.generate_content(
+            text,
+            voice="fa-IR-Standard-A"
+        )
+        
+        with open(filename, "wb") as f:
+            f.write(response.audio_content)
+        
+        print(f"✅ فایل صوتی با موفقیت در '{filename}' ذخیره شد.")
+        return filename
+    except Exception as e:
+        print(f"❌ خطا در تبدیل متن به صوت با Gemini TTS: {e}")
+        return None
+
+def send_audio_to_telegram(token, chat_id, audio_path, caption=""):
+    print("در حال ارسال فایل صوتی به تلگرام...")
+    if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
+    api_url = f"https://api.telegram.org/bot{token}/sendAudio"
+    try:
+        with open(audio_path, 'rb') as audio_file:
+            response = requests.post(
+                api_url, data={'chat_id': chat_id, 'caption': caption, 'parse_mode': 'HTML'},
+                files={'audio': audio_file}, timeout=60)
+            response.raise_for_status()
+            if response.json().get("ok"): print("✅ فایل صوتی با موفقیت به تلگرام ارسال شد.")
+            else: print(f"❌ خطا در ارسال فایل صوتی: {response.text}")
+    except Exception as e: print(f"خطا در فرآیند ارسال فایل صوتی: {e}")
+
 def parse_financial_string(s):
     if not isinstance(s, str): return 0.0
     s = s.strip().replace(',', '')
@@ -113,107 +206,6 @@ def create_fear_greed_gauge_real_scale(current_value, file_str):
 def clean_text_for_speech(html_text):
     soup = bs_for_clean(html_text, "html.parser")
     return soup.get_text()
-
-def send_photo_to_telegram(token, chat_id, photo_path, caption=""):
-    print("\nدر حال ارسال عکس به تلگرام...")
-    if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
-    api_url = f"https://api.telegram.org/bot{token}/sendPhoto"
-    try:
-        with open(photo_path, 'rb') as photo_file:
-            response = requests.post(api_url, data={'chat_id': chat_id, 'caption': caption, 'parse_mode': 'HTML'},
-                                     files={'photo': photo_file}, timeout=30)
-            response.raise_for_status()
-            if response.json().get("ok"): print("✅ عکس با موفقیت به تلگرام ارسال شد.")
-            else: print(f"❌ خطا در ارسال عکس: {response.text}")
-    except Exception as e: print(f"خطا در فرآیند ارسال عکس: {e}")
-
-def send_message_to_telegram(token, chat_id, text):
-    print("در حال ارسال پیام متنی به تلگرام...")
-    if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
-    api_url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
-    try:
-        response = requests.post(api_url, json=payload, timeout=20)
-        response.raise_for_status()
-        if response.json().get("ok"): print("✅ پیام متنی با موفقیت ارسال شد.")
-        else: print(f"❌ خطا در ارسال پیام متنی از تلگرام: {response.text}")
-    except Exception as e: print(f"خطا در فرآیند ارسال پیام متنی: {e}")
-
-def get_gemini_analysis_text(last_row, previous_row, df):
-    """فقط تحلیل متنی را از Gemini دریافت می‌کند."""
-    print("\nدر حال دریافت تحلیل متنی از Gemini...")
-    if not GEMINI_API_KEY: return None
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-pro-latest')
-        
-        prompt = f"""
-        شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. داده‌های زیر را تحلیل کرده و یک گزارش حرفه‌ای برای نمایش در تلگرام آماده کن.
-        **دستورالعمل‌های بسیار مهم برای فرمت:**
-        1.  فقط و فقط از تگ‌های <b>...</b>, <i>...</i>, <code>...</code> استفاده کن.
-        2.  هرگز تگ‌ها را به صورت تودرتو استفاده نکن. مثال اشتباه: <b><i>text</i></b>. مثال صحیح: <b>text</b> یا <i>text</i>.
-        3.  مطمئن شو که تمام تگ‌های باز شده، به درستی بسته شده‌اند (مثلاً <b>text</b>).
-        4.  از کاراکترهای خاص HTML مانند '<' یا '>' در متن عادی (خارج از تگ‌ها) به هیچ وجه استفاده نکن.
-
-        **داده‌های کلیدی:**
-        - تاریخ: {last_row['تاریخ']}
-        - ارزش معاملات: {last_row['ارزش معاملات']:,.1f} میلیارد تومان
-        - شاخص کل: {last_row['شاخص کل']:,.0f} (تغییر: {last_row['شاخص کل'] - previous_row['شاخص کل']:+,.0f})
-        - ورود پول: {last_row['ورود پول']:,.1f} میلیارد تومان
-        - قدرت خریدار: {last_row['قدرت خريد']:.2f}
-        """
-        response = model.generate_content(prompt)
-        print("✅ تحلیل متنی با موفقیت دریافت شد.")
-        return response.text.strip()
-            
-    except Exception as e:
-        print(f"❌ خطا در دریافت تحلیل متنی از Gemini: {e}")
-        return None
-
-def convert_text_to_speech_gemini(text, filename="analysis_audio.mp3"):
-    """متن را با استفاده از مدل TTS داخلی Gemini به صوت تبدیل می‌کند."""
-    print("در حال تبدیل متن به صوت با استفاده از Gemini TTS...")
-    if not GEMINI_API_KEY: return None
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        
-        # --- تغییر کلیدی: این روش صحیح برای فراخوانی API است ---
-        # ابتدا مدل TTS را مشخص می‌کنیم
-        tts_model = genai.GenerativeModel(model_name='models/text-to-speech')
-        
-        # سپس محتوا را با تنظیمات مشخص تولید می‌کنیم
-        response = tts_model.generate_content(
-            prompt=text,
-            generation_config=genai.types.GenerationConfig(
-                voice=genai.types.Voice(name="fa-IR-Standard-A") # صدای مرد فارسی
-            )
-        )
-        
-        # استخراج داده‌های صوتی از پاسخ
-        audio_data = response.candidates[0].content.parts[0].audio
-        
-        with open(filename, "wb") as f:
-            f.write(audio_data)
-        
-        print(f"✅ فایل صوتی با موفقیت در '{filename}' ذخیره شد.")
-        return filename
-    except Exception as e:
-        print(f"❌ خطا در تبدیل متن به صوت با Gemini TTS: {e}")
-        return None
-
-def send_audio_to_telegram(token, chat_id, audio_path, caption=""):
-    print("در حال ارسال فایل صوتی به تلگرام...")
-    if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
-    api_url = f"https://api.telegram.org/bot{token}/sendAudio"
-    try:
-        with open(audio_path, 'rb') as audio_file:
-            response = requests.post(
-                api_url, data={'chat_id': chat_id, 'caption': caption, 'parse_mode': 'HTML'},
-                files={'audio': audio_file}, timeout=60)
-            response.raise_for_status()
-            if response.json().get("ok"): print("✅ فایل صوتی با موفقیت به تلگرام ارسال شد.")
-            else: print(f"❌ خطا در ارسال فایل صوتی: {response.text}")
-    except Exception as e: print(f"خطا در فرآیند ارسال فایل صوتی: {e}")
 
 def main():
     if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GEMINI_API_KEY]):
@@ -303,7 +295,6 @@ def main():
     data_message = ("\n\n" + "-" * 35 + "\n\n").join(filter(None, full_message_blocks))
     send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, data_message)
 
-    # --- دریافت متن و سپس تولید صوت ---
     display_analysis_html = get_gemini_analysis_text(last_row, previous_row, df)
     
     if display_analysis_html:
@@ -323,4 +314,4 @@ def main():
     print(f"\n--- عملیات با موفقیت به پایان رسید. ---")
 
 if __name__ == "__main__":
-    main(
+    main()

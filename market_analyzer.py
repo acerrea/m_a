@@ -35,7 +35,6 @@ else:
 def reshape_text(text):
     return get_display(arabic_reshaper.reshape(str(text)))
 
-# ... (توابع send_photo, send_message, parsers, ... بدون تغییر)
 def send_photo_to_telegram(token, chat_id, photo_path, caption=""):
     print("\nدر حال ارسال عکس به تلگرام...")
     if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
@@ -58,7 +57,7 @@ def send_message_to_telegram(token, chat_id, text):
         response = requests.post(api_url, json=payload, timeout=20)
         response.raise_for_status()
         if response.json().get("ok"): print("✅ پیام متنی با موفقیت ارسال شد.")
-        else: print(f"❌ خطا در ارسال پیام متنی: {response.json()}")
+        else: print(f"❌ خطا در ارسال پیام متنی: {response.text}")
     except Exception as e: print(f"خطا در فرآیند ارسال پیام متنی: {e}")
 
 def get_gemini_analysis_text(last_row, previous_row, df):
@@ -67,14 +66,15 @@ def get_gemini_analysis_text(last_row, previous_row, df):
     if not GEMINI_API_KEY: return None
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-pro')
         
         prompt = f"""
         شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. داده‌های زیر را تحلیل کرده و یک گزارش حرفه‌ای برای نمایش در تلگرام آماده کن.
         **دستورالعمل‌های بسیار مهم برای فرمت:**
-        1.  فقط از تگ‌های <b>, <i>, <code> استفاده کن.
-        2.  هرگز تگ‌ها را به صورت تودرتو استفاده نکن (مثلاً <b><i>...</i></b> اشتباه است).
-        3.  مطمئن شو که تمام تگ‌های باز شده، بسته شده‌اند.
+        1.  فقط از تگ‌های <b>...</b>, <i>...</i>, <code>...</code> استفاده کن.
+        2.  هرگز تگ‌ها را به صورت تودرتو استفاده نکن. مثال اشتباه: <b><i>text</i></b>. مثال صحیح: <b>text</b> یا <i>text</i>.
+        3.  مطمئن شو که تمام تگ‌های باز شده، به درستی بسته شده‌اند (مثلاً <b>text</b>).
+        4.  از کاراکترهای < یا > در متن عادی استفاده نکن.
 
         **داده‌های کلیدی:**
         - تاریخ: {last_row['تاریخ']}

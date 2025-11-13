@@ -28,11 +28,11 @@ jobs:
     - name: Install Persian Fonts
       run: |
         # دانلود و نصب فونت‌های وزیر برای نمودار
-        wget https://github.com/rastikerdar/vazirmatn/releases/download/v33.0.0/Vazirmatn-FD-font-face.zip
-        unzip Vazirmatn-FD-font-face.zip
+        wget https://github.com/rastikerdar/vazirmatn/releases/download/v33.0.0/Vazirmatn-FD-v33.0.0.zip
+        unzip '*.zip'
         # کپی فونت‌ها به مسیری که اسکریپت پایتون بتواند پیدا کند
-        cp "Vazirmatn-FD-ExtraBold.ttf" .
-        cp "Vazirmatn-FD-Regular.ttf" .
+        cp fonts/ttf/Vazirmatn-FD-ExtraBold.ttf .
+        cp fonts/ttf/Vazirmatn-FD-Regular.ttf .
 
     - name: Run the market analysis script
       env:

@@ -40,7 +40,7 @@ else:
 def reshape_text(text):
     return get_display(arabic_reshaper.reshape(str(text)))
 
-# ... (تمام توابع send_photo, send_message, get_gemini_analysis, parsers, ... اینجا قرار می‌گیرند) ...
+# ... (تمام توابع send_photo, send_message, parsers, ... اینجا قرار می‌گیرند) ...
 def send_photo_to_telegram(token, chat_id, photo_path, caption=""):
     print("\nدر حال ارسال عکس به تلگرام...")
     if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
@@ -72,8 +72,15 @@ def get_gemini_analysis(last_row, previous_row, df):
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-flash-lite-latest')
+        
         prompt = f"""
-        شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. لطفاً داده‌های زیر را که مربوط به امروز و دیروز بازار سهام تهران است، تحلیل کنید. تحلیل شما باید حرفه‌ای، عمیق و به زبان فارسی روان باشد. از فرمت HTML تلگرام (<b>, <i>, <code>) برای برجسته‌سازی استفاده کنید.
+        شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. لطفاً داده‌های زیر را که مربوط به امروز و دیروز بازار سهام تهران است، تحلیل کنید.
+        
+        **دستورالعمل‌های خروجی:**
+        1.  تحلیل باید حرفه‌ای، عمیق و به زبان فارسی روان باشد.
+        2.  از فرمت HTML تلگرام (<b>, <i>, <code>) برای برجسته‌سازی استفاده کنید.
+        3.  **بسیار مهم: کل متن تحلیل فارسی را به صورت کامل اعراب‌گذاری (Diacritize) کن تا برای تبدیل به صوت آماده باشد. به عنوان مثال، به جای "شاخص کل"، بنویس "شاخِصِ کُلّ".**
+
         **داده‌های کلیدی:**
         - **تاریخ گزارش:** {last_row['تاریخ']}
         - **ارزش معاملات خرد امروز:** {last_row['ارزش معاملات']:,.1f} میلیارد تومان (دیروز: {previous_row['ارزش معاملات']:,.1f})
@@ -81,28 +88,25 @@ def get_gemini_analysis(last_row, previous_row, df):
         - **شاخص هم‌وزن امروز:** {last_row['شاخص هم‌وزن']:,.0f} (تغییر: {(last_row['شاخص هم‌وزن'] - previous_row['شاخص هم‌وزن']):+,.0f})
         - **ورود/خروج پول حقیقی امروز:** {last_row['ورود پول']:,.1f} میلیارد تومان
         - **قدرت خریدار به فروشنده امروز:** {last_row['قدرت خريد']:.2f}
-        **وظیفه شما:**
-        1.  یک عنوان جذاب و توصیفی برای تحلیل امروز انتخاب کنید.
-        2.  **تحلیل جامع بازار:** سنتیمنت کلی بازار را تحلیل کنید.
-        3.  **نقاط قوت و ضعف:** مهم‌ترین سیگنال‌های مثبت و منفی را لیست کنید.
-        4.  **چشم‌انداز کوتاه‌مدت:** یک نتیجه‌گیری و چشم‌انداز ارائه دهید.
-        **خروجی باید به این شکل باشد:**
-        📝 <b>[عنوان جذاب شما]</b>
-        [تحلیل جامع شما]
-        🟢 <b>نقاط قوت:</b>
-        - [نکته ۱]
-        🔴 <b>نقاط ضعف:</b>
-        - [نکته ۱]
-        💡 <b>جمع‌بندی:</b>
-        [نتیجه‌گیری نهایی]
+
+        **ساختار خروجی باید به این شکل باشد (با اعراب‌گذاری کامل):**
+        📝 <b>[عُنوانِ جَذّابِ شُما]</b>
+        [تَحلیلِ جامِعِ شُما]
+        🟢 <b>نُقاطِ قُوَّت:</b>
+        - [نُکتِهِ ۱]
+        🔴 <b>نُقاطِ ضَعف:</b>
+        - [نُکتِهِ ۱]
+        💡 <b>جَمع‌بَندی:</b>
+        [نَتیجِه‌گیریِ نَهاییِ شُما]
         """
+        
         response = model.generate_content(prompt)
-        print("✅ تحلیل هوش مصنوعی با موفقیت دریافت شد.")
+        print("✅ تحلیل هوش مصنوعی (با اعراب‌گذاری) با موفقیت دریافت شد.")
         return response.text
     except Exception as e:
         print(f"❌ خطا در ارتباط با Gemini API: {e}")
         return "تحلیل هوش مصنوعی در حال حاضر در دسترس نیست."
-
+        
 def parse_financial_string(s):
     if not isinstance(s, str): return 0.0
     s = s.strip().replace(',', '')
@@ -120,12 +124,12 @@ def parse_index_string(s):
 
 def generate_proximity_alert(current_value, high_value, low_value, high_label, low_label, threshold_percent=10):
     alert_msg = ""
-    if high_value > 0:
+    if high_value > 0 and high_value > current_value:
         dist_from_high = abs((current_value - high_value) / high_value) * 100
         if dist_from_high <= threshold_percent:
             alert_msg = (f"  ⚠️ <b>هشدار:</b> با فاصله {dist_from_high:.1f}% از <b>{high_label}</b>، "
                          f"<b>احتمال</b> افزایش ریسک اصلاح و عرضه وجود دارد.")
-    if low_value > 0 and not alert_msg:
+    if low_value > 0 and not alert_msg and current_value > low_value:
         dist_from_low = abs((current_value - low_value) / low_value) * 100
         if dist_from_low <= threshold_percent:
             alert_msg = (f"  💡 <b>نکته:</b> با فاصله {dist_from_low:.1f}% از <b>{low_label}</b>، "
@@ -183,26 +187,7 @@ def clean_text_for_speech(html_text):
     soup = bs_for_clean(html_text, "html.parser")
     return soup.get_text()
 
-def add_diacritics_to_text(text):
-    """متن فارسی را با استفاده از یک API آنلاین اعراب‌گذاری می‌کند."""
-    print("در حال اعراب‌گذاری متن برای تلفظ بهتر...")
-    api_url = "https://api.onereach.ai/diacritize/v1/auto"
-    headers = {'Content-Type': 'text/plain;charset=utf-8'}
-    chunk_size, chunks, diacritized_chunks = 250, [text[i:i + 250] for i in range(0, len(text), 250)], []
-    try:
-        for chunk in chunks:
-            response = requests.post(api_url, data=chunk.encode('utf-8'), headers=headers, timeout=20)
-            response.raise_for_status()
-            diacritized_chunks.append(response.text)
-        full_diacritized_text = "".join(diacritized_chunks)
-        print("✅ اعراب‌گذاری با موفقیت انجام شد.")
-        return full_diacritized_text
-    except Exception as e:
-        print(f"❌ خطا در فرآیند اعراب‌گذاری: {e}. از متن اصلی بدون اعراب استفاده می‌شود.")
-        return text
-
 async def convert_text_to_speech_async(text, filename="analysis_audio.mp3"):
-    """متن را با استفاده از Edge TTS به صورت ناهمگام به فایل صوتی تبدیل می‌کند."""
     print("در حال تبدیل متن به صوت با استفاده از Edge TTS...")
     try:
         communicate = edge_tts.Communicate(text, "fa-IR-FaridNeural") # صدای مرد
@@ -229,8 +214,7 @@ def send_audio_to_telegram(token, chat_id, audio_path, caption=""):
 
 def main():
     if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID]):
-        print("❌ متغیرهای محیطی تلگرام تنظیم نشده‌اند. برنامه متوقف می‌شود.")
-        return
+        print("❌ متغیرهای محیطی تلگرام تنظیم نشده‌اند. برنامه متوقف می‌شود."); return
 
     print("--- شروع فرآیند تحلیل روزانه بازار ---")
     print("در حال دریافت داده‌ها از TradersArena.ir...")
@@ -241,7 +225,7 @@ def main():
         soup = BeautifulSoup(html.text, 'html.parser')
         table = soup.find('table', class_='sticky market')
         if not table:
-            print("❌❌❌ خطای بحرانی: جدول داده‌ها یافت نشد. احتمالاً ساختار سایت تغییر کرده است."); return
+            print("❌❌❌ خطای بحرانی: جدول داده‌ها یافت نشد."); return
         for tr in table.find_all('tr')[1:]:
             tds = tr.find_all('td')
             if len(tds) > 22 and parse_financial_string(tds[2].text) > 0:
@@ -253,8 +237,7 @@ def main():
     df = pd.DataFrame(data).iloc[::-1].reset_index(drop=True)
     last_row, previous_row = df.iloc[-1], df.iloc[-2]
     
-    last_value = last_row['ارزش معاملات']
-    last_date = last_row['تاریخ']
+    last_value, last_date = last_row['ارزش معاملات'], last_row['تاریخ']
     
     generated_filename = create_fear_greed_gauge_real_scale(last_value, now_str_file)
     if generated_filename and os.path.exists(generated_filename):
@@ -265,7 +248,6 @@ def main():
     
     # --- ساخت پیام داده‌های خام (با فرمت کامل و صحیح) ---
     full_message_blocks = []
-    
     block1_parts = ["📈 <b>تحلیل ارزش معاملات</b>"]
     change = last_value - previous_row['ارزش معاملات']
     percent = (change / previous_row['ارزش معاملات'] * 100) if previous_row['ارزش معاملات'] else 0
@@ -283,7 +265,6 @@ def main():
             block1_parts.append("\n" + "🔔 <b>تحلیل تکنیکال (ارزش معاملات):</b>")
             block1_parts.extend([f"  - {point}" for point in ma_analysis])
     full_message_blocks.append("\n".join(block1_parts))
-
     block_indices = ["📉 <b>تحلیل شاخص‌های بازار</b>"]
     for name, key in [('کل', 'شاخص کل'), ('هم‌وزن', 'شاخص هم‌وزن')]:
         current_idx, prev_idx = last_row[key], previous_row[key]
@@ -331,8 +312,7 @@ def main():
         send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ai_message)
 
         text_for_speech_clean = clean_text_for_speech(ai_analysis_html)
-        diacritized_text = add_diacritics_to_text(text_for_speech_clean)
-        audio_filename = asyncio.run(convert_text_to_speech_async(diacritized_text))
+        audio_filename = asyncio.run(convert_text_to_speech_async(text_for_speech_clean))
         
         if audio_filename and os.path.exists(audio_filename):
             audio_caption = "🎧 <b>نسخه صوتی تحلیل روز</b>\n\n" \

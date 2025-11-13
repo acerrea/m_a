@@ -1,0 +1,42 @@
+name: Daily Market Analysis Bot
+
+on:
+  workflow_dispatch: # به شما اجازه می‌دهد که به صورت دستی هم اجرا کنید
+  schedule:
+    # این کد را هر روز ساعت 14:00 UTC اجرا می‌کند
+    # که معادل 17:30 به وقت تهران است (مناسب برای بعد از بازار)
+    - cron: '0 14 * * 1-5' # دوشنبه تا جمعه
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Install Persian Fonts
+      run: |
+        # دانلود و نصب فونت‌های وزیر برای نمودار
+        wget https://github.com/rastikerdar/vazirmatn/releases/download/v33.0.0/Vazirmatn-FD-font-face.zip
+        unzip Vazirmatn-FD-font-face.zip
+        # کپی فونت‌ها به مسیری که اسکریپت پایتون بتواند پیدا کند
+        cp "Vazirmatn-FD-ExtraBold.ttf" .
+        cp "Vazirmatn-FD-Regular.ttf" .
+
+    - name: Run the market analysis script
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: python market_analyzer.py # نام فایل پایتون شما

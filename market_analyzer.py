@@ -67,7 +67,7 @@ def get_gemini_analysis_text(last_row, previous_row, df):
     if not GEMINI_API_KEY: return None
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-pro-latest') # استفاده از بهترین مدل برای کیفیت بالا
+        model = genai.GenerativeModel('gemini-flash-lite-latest') # استفاده از بهترین مدل برای کیفیت بالا
         
         prompt = f"""
         شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. داده‌های زیر را تحلیل کرده و یک گزارش حرفه‌ای، خوانا و بدون اعراب‌گذاری برای نمایش در تلگرام آماده کن. از فرمت HTML (<b>, <i>, <code>) استفاده کن.

@@ -20,9 +20,9 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        # ffmpeg و libasound2 برای پردازش صوتی مفید هستند
         sudo apt-get update
-        sudo apt-get install -y ffmpeg libasound2
+        # --- تغییر: استفاده از نام پکیج صحیح برای اوبونتو جدید ---
+        sudo apt-get install -y ffmpeg libasound2t64
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     

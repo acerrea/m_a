@@ -41,12 +41,9 @@ def reshape_text(text):
     return get_display(arabic_reshaper.reshape(str(text)))
 
 # ... (تمام توابع send_photo, send_message, get_gemini_analysis, parsers, ... اینجا قرار می‌گیرند) ...
-# ... (کپی کردن از نسخه قبلی چون تغییری نکرده‌اند)
 def send_photo_to_telegram(token, chat_id, photo_path, caption=""):
     print("\nدر حال ارسال عکس به تلگرام...")
-    if not token or not chat_id:
-        print("❌ توکن تلگرام یا آیدی چت تعریف نشده است.")
-        return
+    if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
     api_url = f"https://api.telegram.org/bot{token}/sendPhoto"
     try:
         with open(photo_path, 'rb') as photo_file:
@@ -59,9 +56,7 @@ def send_photo_to_telegram(token, chat_id, photo_path, caption=""):
 
 def send_message_to_telegram(token, chat_id, text):
     print("در حال ارسال پیام متنی به تلگرام...")
-    if not token or not chat_id:
-        print("❌ توکن تلگرام یا آیدی چت تعریف نشده است.")
-        return
+    if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
     api_url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
     try:
@@ -159,8 +154,7 @@ def create_fear_greed_gauge_real_scale(current_value, file_str):
                      {'range': (15000, 20000), 'color': '#8dc63f', 'label': 'طمع شدید'}, 
                      {'range': (20000, GAUGE_DISPLAY_MAX), 'color': '#00a651', 'label': 'طمع\nخیلی شدید'}]
     fig, ax = plt.subplots(figsize=(10, 6), facecolor='#f0f0f0')
-    ax.set_aspect('equal')
-    ax.axis('off')
+    ax.set_aspect('equal'); ax.axis('off')
     center, radius, width = (0, 0), 1.0, 0.45
     for seg in segments_real:
         start_val, end_val = seg['range']
@@ -172,8 +166,7 @@ def create_fear_greed_gauge_real_scale(current_value, file_str):
         x, y = (radius - width / 2) * np.cos(mid_angle_rad), (radius - width / 2) * np.sin(mid_angle_rad)
         ax.text(x, y, reshape_text(seg['label']), ha='center', va='center', fontproperties=font_prop_bold, fontsize=16, color='white', linespacing=0.95)
     needle_angle_rad = np.deg2rad(180 - (min(current_value, GAUGE_DISPLAY_MAX) / GAUGE_DISPLAY_MAX * 180))
-    needle_x = (radius - 0.1) * np.cos(needle_angle_rad)
-    needle_y = (radius - 0.1) * np.sin(needle_angle_rad)
+    needle_x, needle_y = (radius - 0.1) * np.cos(needle_angle_rad), (radius - 0.1) * np.sin(needle_angle_rad)
     ax.plot([0, needle_x], [0, needle_y], color='black', lw=5, solid_capstyle='round', zorder=5)
     ax.add_patch(Circle((0, 0), 0.18, color='black', zorder=10))
     center_text = f"{current_value / 1000:.1f}\nهمت" if current_value >= 1000 else f"{int(current_value)}\nمیلیارد ت"
@@ -182,8 +175,7 @@ def create_fear_greed_gauge_real_scale(current_value, file_str):
     fig.text(0.5, 0.05, "Telegram: @Data_Bors", ha='center', fontproperties=font_prop_regular, fontsize=14, color='gray')
     ax.set_xlim(-1.4, 1.4); ax.set_ylim(-0.2, 1.35)
     filename = f'Fear_Greed_Gauge-{file_str}.png'
-    plt.savefig(filename, dpi=250, bbox_inches='tight')
-    plt.close(fig)
+    plt.savefig(filename, dpi=250, bbox_inches='tight'); plt.close(fig)
     print(f"✅ شاخص نهایی با موفقیت در فایل '{filename}' ذخیره شد.")
     return filename
 
@@ -191,14 +183,29 @@ def clean_text_for_speech(html_text):
     soup = bs_for_clean(html_text, "html.parser")
     return soup.get_text()
 
+def add_diacritics_to_text(text):
+    """متن فارسی را با استفاده از یک API آنلاین اعراب‌گذاری می‌کند."""
+    print("در حال اعراب‌گذاری متن برای تلفظ بهتر...")
+    api_url = "https://api.onereach.ai/diacritize/v1/auto"
+    headers = {'Content-Type': 'text/plain;charset=utf-8'}
+    chunk_size, chunks, diacritized_chunks = 250, [text[i:i + 250] for i in range(0, len(text), 250)], []
+    try:
+        for chunk in chunks:
+            response = requests.post(api_url, data=chunk.encode('utf-8'), headers=headers, timeout=20)
+            response.raise_for_status()
+            diacritized_chunks.append(response.text)
+        full_diacritized_text = "".join(diacritized_chunks)
+        print("✅ اعراب‌گذاری با موفقیت انجام شد.")
+        return full_diacritized_text
+    except Exception as e:
+        print(f"❌ خطا در فرآیند اعراب‌گذاری: {e}. از متن اصلی بدون اعراب استفاده می‌شود.")
+        return text
+
 async def convert_text_to_speech_async(text, filename="analysis_audio.mp3"):
     """متن را با استفاده از Edge TTS به صورت ناهمگام به فایل صوتی تبدیل می‌کند."""
     print("در حال تبدیل متن به صوت با استفاده از Edge TTS...")
     try:
-        # --- راه‌حل: استفاده از یک صدای جایگزین که معمولاً مشکل 401 ندارد ---
-        # صدای مرد فارسی: fa-IR-FaridNeural
-        # صدای زن فارسی: fa-IR-DilaraNeural
-        communicate = edge_tts.Communicate(text, "fa-IR-DilaraNeural")
+        communicate = edge_tts.Communicate(text, "fa-IR-FaridNeural") # صدای مرد
         await communicate.save(filename)
         print(f"✅ فایل صوتی با موفقیت در '{filename}' ذخیره شد.")
         return filename
@@ -208,9 +215,7 @@ async def convert_text_to_speech_async(text, filename="analysis_audio.mp3"):
 
 def send_audio_to_telegram(token, chat_id, audio_path, caption=""):
     print("در حال ارسال فایل صوتی به تلگرام...")
-    if not token or not chat_id:
-        print("❌ توکن تلگرام یا آیدی چت تعریف نشده است.")
-        return
+    if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
     api_url = f"https://api.telegram.org/bot{token}/sendAudio"
     try:
         with open(audio_path, 'rb') as audio_file:
@@ -220,8 +225,7 @@ def send_audio_to_telegram(token, chat_id, audio_path, caption=""):
             response.raise_for_status()
             if response.json().get("ok"): print("✅ فایل صوتی با موفقیت به تلگرام ارسال شد.")
             else: print(f"❌ خطا در ارسال فایل صوتی: {response.json()}")
-    except Exception as e:
-        print(f"خطا در فرآیند ارسال فایل صوتی: {e}")
+    except Exception as e: print(f"خطا در فرآیند ارسال فایل صوتی: {e}")
 
 def main():
     if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID]):
@@ -235,24 +239,16 @@ def main():
         html = requests.get('https://tradersarena.ir/market/history?type=1', timeout=30, params={'perPage': 3000})
         html.raise_for_status()
         soup = BeautifulSoup(html.text, 'html.parser')
-        
         table = soup.find('table', class_='sticky market')
         if not table:
-            print("❌❌❌ خطای بحرانی: جدول داده‌ها یافت نشد. احتمالاً ساختار سایت تغییر کرده است.")
-            return
-        
+            print("❌❌❌ خطای بحرانی: جدول داده‌ها یافت نشد. احتمالاً ساختار سایت تغییر کرده است."); return
         for tr in table.find_all('tr')[1:]:
             tds = tr.find_all('td')
             if len(tds) > 22 and parse_financial_string(tds[2].text) > 0:
                 data.append({"تاریخ": tds[1].text.strip(), 'ارزش معاملات': parse_financial_string(tds[2].text), 'قدرت خريد': parse_financial_string(tds[15].text), 'قدرت 5 روزه': parse_financial_string(tds[16].text), 'قدرت 20 روزه': parse_financial_string(tds[17].text), 'ورود پول': parse_financial_string(tds[18].text), 'ورود پول 5 روزه': parse_financial_string(tds[19].text), 'ورود پول 20 روزه': parse_financial_string(tds[20].text), 'شاخص کل': parse_index_string(tds[21].text), 'شاخص هم‌وزن': parse_index_string(tds[22].text)})
         print(f"✅ داده‌های {len(data)} روز با موفقیت دریافت شد.")
-    except Exception as e: 
-        print(f"❌ خطا در دریافت داده: {e}")
-        return
-        
-    if len(data) < 2: 
-        print("❌ داده کافی برای تحلیل مقایسه‌ای وجود ندارد.")
-        return
+    except Exception as e: print(f"❌ خطا در دریافت داده: {e}"); return
+    if len(data) < 2: print("❌ داده کافی برای تحلیل مقایسه‌ای وجود ندارد."); return
 
     df = pd.DataFrame(data).iloc[::-1].reset_index(drop=True)
     last_row, previous_row = df.iloc[-1], df.iloc[-2]
@@ -270,7 +266,6 @@ def main():
     # --- ساخت پیام داده‌های خام (با فرمت کامل و صحیح) ---
     full_message_blocks = []
     
-    # Block 1: ارزش معاملات
     block1_parts = ["📈 <b>تحلیل ارزش معاملات</b>"]
     change = last_value - previous_row['ارزش معاملات']
     percent = (change / previous_row['ارزش معاملات'] * 100) if previous_row['ارزش معاملات'] else 0
@@ -289,7 +284,6 @@ def main():
             block1_parts.extend([f"  - {point}" for point in ma_analysis])
     full_message_blocks.append("\n".join(block1_parts))
 
-    # Block 2: شاخص‌ها
     block_indices = ["📉 <b>تحلیل شاخص‌های بازار</b>"]
     for name, key in [('کل', 'شاخص کل'), ('هم‌وزن', 'شاخص هم‌وزن')]:
         current_idx, prev_idx = last_row[key], previous_row[key]
@@ -299,8 +293,7 @@ def main():
             previous_ath = df[key][:-1].max()
             if current_idx > previous_ath: ath_record_badge = " (🚀 <b>رکورد جدید!</b>)"
             ath_message = f"  - سقف تاریخی: {int(max(current_idx, previous_ath)):,.0f}"
-        else:
-            ath_message = f"  - سقف تاریخی: {current_idx:,.0f}"
+        else: ath_message = f"  - سقف تاریخی: {current_idx:,.0f}"
         yearly_subset = df.tail(252)
         yearly_low = yearly_subset[key].min()
         previous_yearly_high = yearly_subset[key][:-1].max() if len(yearly_subset) > 1 else yearly_low
@@ -319,7 +312,6 @@ def main():
         block_indices.append("\n".join(idx_parts))
     full_message_blocks.append("\n\n".join(block_indices))
     
-    # Block 3: آمار تکمیلی
     block3_parts = ["📊 <b>آمار تکمیلی بازار</b>"]
     p_power, p_power_prev = last_row['قدرت خريد'], previous_row['قدرت خريد']
     p_money, p_money_prev = last_row['ورود پول'], previous_row['ورود پول']
@@ -327,21 +319,20 @@ def main():
     block3_parts.append(f"{'🟢' if p_money >= 0 else '🔴'} <b>ورود پول:</b> <b>{p_money:,.1f}</b> میلیارد.ت <i>(دیروز: {p_money_prev:,.1f})</i> {'⬆️' if p_money > p_money_prev else '⬇️'}\n" f"    <i>میانگین ۵ روزه:</i>  {last_row['ورود پول 5 روزه']:,.1f}\n" f"    <i>میانگین ۲۰ روزه:</i> {last_row['ورود پول 20 روزه']:,.1f}")
     full_message_blocks.append("\n\n".join(block3_parts))
     
-    # Footer
     footer_parts = [f"<i>⏳ بروزرسانی: {update_time_str}</i>", f"🔗 منبع داده‌ها: <code>{DATA_SOURCE_URL}</code>", f"<i>#گزارش_روزانه_بازار</i>", f"🆔 @Data_Bors"]
     full_message_blocks.append("\n".join(footer_parts))
 
     data_message = ("\n\n" + "-" * 35 + "\n\n").join(filter(None, full_message_blocks))
     send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, data_message)
 
-    # --- دریافت، ارسال متن و ساخت صوت تحلیل هوش مصنوعی ---
     ai_analysis_html = get_gemini_analysis(last_row, previous_row, df)
     if ai_analysis_html:
         ai_message = ai_analysis_html + "\n\n" + "\n".join([f"<i>این تحلیل توسط هوش مصنوعی (Google Gemini) تولید شده است.</i>", "🆔 @Data_Bors"])
         send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ai_message)
 
-        text_for_speech = clean_text_for_speech(ai_analysis_html)
-        audio_filename = asyncio.run(convert_text_to_speech_async(text_for_speech))
+        text_for_speech_clean = clean_text_for_speech(ai_analysis_html)
+        diacritized_text = add_diacritics_to_text(text_for_speech_clean)
+        audio_filename = asyncio.run(convert_text_to_speech_async(diacritized_text))
         
         if audio_filename and os.path.exists(audio_filename):
             audio_caption = "🎧 <b>نسخه صوتی تحلیل روز</b>\n\n" \

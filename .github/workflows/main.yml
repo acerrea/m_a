@@ -28,7 +28,7 @@ jobs:
     - name: Install Persian Fonts
       run: |
         # دانلود و نصب فونت‌های وزیر برای نمودار
-        wget https://github.com/rastikerdar/vazirmatn/releases/download/v33.0.0/Vazirmatn-FD-v33.0.0.zip
+        wget https://github.com/rastikerdar/vazirmatn/releases/download/v33.003/vazirmatn-v33.003.zip
         unzip '*.zip'
         # کپی فونت‌ها به مسیری که اسکریپت پایتون بتواند پیدا کند
         cp fonts/ttf/Vazirmatn-FD-ExtraBold.ttf .

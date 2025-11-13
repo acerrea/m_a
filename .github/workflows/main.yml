@@ -18,14 +18,11 @@ jobs:
       with:
         python-version: '3.10'
 
-    # <<< مرحله جدید برای نصب ابزار صوتی >>>
-    - name: Install FFmpeg
+    - name: Install Dependencies
       run: |
+        # ffmpeg و libasound2 برای پردازش صوتی مفید هستند
         sudo apt-get update
-        sudo apt-get install -y ffmpeg
-
-    - name: Install dependencies
-      run: |
+        sudo apt-get install -y ffmpeg libasound2
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     

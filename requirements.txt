@@ -1,0 +1,9 @@
+requests
+beautifulsoup4
+pandas
+matplotlib
+jdatetime
+arabic_reshaper
+python-bidi
+numpy
+google-generativeai

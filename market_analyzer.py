@@ -67,10 +67,16 @@ def get_gemini_analysis_text(last_row, previous_row, df):
     if not GEMINI_API_KEY: return None
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-flash-lite-latest') # استفاده از بهترین مدل برای کیفیت بالا
+        model = genai.GenerativeModel('gemini-flash-lite-latest')
         
         prompt = f"""
-        شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. داده‌های زیر را تحلیل کرده و یک گزارش حرفه‌ای، خوانا و بدون اعراب‌گذاری برای نمایش در تلگرام آماده کن. از فرمت HTML (<b>, <i>, <code>) استفاده کن.
+        شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. داده‌های زیر را تحلیل کرده و یک گزارش حرفه‌ای برای نمایش در تلگرام آماده کن.
+        **دستورالعمل‌های بسیار مهم برای فرمت:**
+        1.  فقط از تگ‌های <b>, <i>, <code> استفاده کن.
+        2.  هرگز تگ‌ها را به صورت تودرتو استفاده نکن (مثلاً <b><i>...</i></b> اشتباه است).
+        3.  مطمئن شو که تمام تگ‌های باز شده، بسته شده‌اند.
+
+        **داده‌های کلیدی:**
         - تاریخ: {last_row['تاریخ']}
         - ارزش معاملات: {last_row['ارزش معاملات']:,.1f} میلیارد تومان
         - شاخص کل: {last_row['شاخص کل']:,.0f} (تغییر: {last_row['شاخص کل'] - previous_row['شاخص کل']:+,.0f})
@@ -91,12 +97,11 @@ def convert_text_to_speech_gemini(text, filename="analysis_audio.mp3"):
     if not GEMINI_API_KEY: return None
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        # استفاده از مدل تخصصی متن به صوت گوگل
         tts_model = genai.GenerativeModel('models/text-to-speech')
 
         response = tts_model.generate_content(
             text,
-            voice="fa-IR-Standard-A"  # انتخاب صدای مرد فارسی
+            voice="fa-IR-Standard-A"  # صدای مرد فارسی
         )
         
         with open(filename, "wb") as f:

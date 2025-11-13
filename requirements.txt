@@ -7,4 +7,3 @@ arabic_reshaper
 python-bidi
 numpy
 google-generativeai
-edge-tts

@@ -1,9 +1,11 @@
 name: Daily Market Analysis Bot
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # به شما اجازه می‌دهد که به صورت دستی هم اجرا کنید
   schedule:
-    - cron: '0 14 * * 1-5' # ساعت 17:30 تهران، دوشنبه تا جمعه میلادی
+    # ساعت 19:00 به وقت تهران (15:30 UTC)
+    # از شنبه تا چهارشنبه
+    - cron: '30 15 * * 6,0,1,2,3'
 
 jobs:
   build-and-run:
@@ -23,8 +25,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    # بخش مربوط به فونت به طور کامل حذف شد.
-
     - name: Run the market analysis script
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

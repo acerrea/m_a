@@ -79,7 +79,7 @@ def get_gemini_analysis(last_row, previous_row, df):
         return "تحلیل هوش مصنوعی به دلیل عدم وجود کلید API در دسترس نیست."
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        model = genai.GenerativeModel('gemini-flash-lite-latest')
         prompt = f"""
         شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. لطفاً داده‌های زیر را که مربوط به امروز و دیروز بازار سهام تهران است، تحلیل کنید. تحلیل شما باید حرفه‌ای، عمیق و به زبان فارسی روان باشد. از فرمت HTML تلگرام (<b>, <i>, <code>) برای برجسته‌سازی استفاده کنید.
 

@@ -21,10 +21,11 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        # --- تغییر: استفاده از نام پکیج صحیح برای اوبونتو جدید ---
         sudo apt-get install -y ffmpeg libasound2t64
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        # --- خط کلیدی: آپدیت کتابخانه گوگل به آخرین نسخه ---
+        pip install --upgrade google-generativeai
     
     - name: Run the market analysis script
       env:

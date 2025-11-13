@@ -40,6 +40,8 @@ else:
 def reshape_text(text):
     return get_display(arabic_reshaper.reshape(str(text)))
 
+# ... (تمام توابع send_photo, send_message, get_gemini_analysis, parsers, ... اینجا قرار می‌گیرند) ...
+# ... (کپی کردن از نسخه قبلی چون تغییری نکرده‌اند)
 def send_photo_to_telegram(token, chat_id, photo_path, caption=""):
     print("\nدر حال ارسال عکس به تلگرام...")
     if not token or not chat_id:
@@ -71,15 +73,12 @@ def send_message_to_telegram(token, chat_id, text):
 
 def get_gemini_analysis(last_row, previous_row, df):
     print("\nدر حال دریافت تحلیل از هوش مصنوعی Gemini...")
-    if not GEMINI_API_KEY:
-        print("❌ کلید API جمنای یافت نشد. تحلیل هوش مصنوعی انجام نمی‌شود.")
-        return "تحلیل هوش مصنوعی به دلیل عدم وجود کلید API در دسترس نیست."
+    if not GEMINI_API_KEY: return "تحلیل هوش مصنوعی به دلیل عدم وجود کلید API در دسترس نیست."
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-flash-lite-latest')
         prompt = f"""
         شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. لطفاً داده‌های زیر را که مربوط به امروز و دیروز بازار سهام تهران است، تحلیل کنید. تحلیل شما باید حرفه‌ای، عمیق و به زبان فارسی روان باشد. از فرمت HTML تلگرام (<b>, <i>, <code>) برای برجسته‌سازی استفاده کنید.
-
         **داده‌های کلیدی:**
         - **تاریخ گزارش:** {last_row['تاریخ']}
         - **ارزش معاملات خرد امروز:** {last_row['ارزش معاملات']:,.1f} میلیارد تومان (دیروز: {previous_row['ارزش معاملات']:,.1f})
@@ -87,13 +86,11 @@ def get_gemini_analysis(last_row, previous_row, df):
         - **شاخص هم‌وزن امروز:** {last_row['شاخص هم‌وزن']:,.0f} (تغییر: {(last_row['شاخص هم‌وزن'] - previous_row['شاخص هم‌وزن']):+,.0f})
         - **ورود/خروج پول حقیقی امروز:** {last_row['ورود پول']:,.1f} میلیارد تومان
         - **قدرت خریدار به فروشنده امروز:** {last_row['قدرت خريد']:.2f}
-
         **وظیفه شما:**
         1.  یک عنوان جذاب و توصیفی برای تحلیل امروز انتخاب کنید.
         2.  **تحلیل جامع بازار:** سنتیمنت کلی بازار را تحلیل کنید.
         3.  **نقاط قوت و ضعف:** مهم‌ترین سیگنال‌های مثبت و منفی را لیست کنید.
         4.  **چشم‌انداز کوتاه‌مدت:** یک نتیجه‌گیری و چشم‌انداز ارائه دهید.
-        
         **خروجی باید به این شکل باشد:**
         📝 <b>[عنوان جذاب شما]</b>
         [تحلیل جامع شما]
@@ -125,6 +122,32 @@ def parse_index_string(s):
     try:
         return int(s.strip().replace(',', ''))
     except (ValueError, AttributeError): return 0
+
+def generate_proximity_alert(current_value, high_value, low_value, high_label, low_label, threshold_percent=10):
+    alert_msg = ""
+    if high_value > 0:
+        dist_from_high = abs((current_value - high_value) / high_value) * 100
+        if dist_from_high <= threshold_percent:
+            alert_msg = (f"  ⚠️ <b>هشدار:</b> با فاصله {dist_from_high:.1f}% از <b>{high_label}</b>، "
+                         f"<b>احتمال</b> افزایش ریسک اصلاح و عرضه وجود دارد.")
+    if low_value > 0 and not alert_msg:
+        dist_from_low = abs((current_value - low_value) / low_value) * 100
+        if dist_from_low <= threshold_percent:
+            alert_msg = (f"  💡 <b>نکته:</b> با فاصله {dist_from_low:.1f}% از <b>{low_label}</b>، "
+                         f"<b>احتمال</b> برگشت بازار و پایان روند نزولی وجود دارد.")
+    return alert_msg
+
+def analyze_moving_averages(df):
+    analysis_points = []
+    if len(df) < 31: return analysis_points
+    ma5 = df['ارزش معاملات'].rolling(window=5).mean().iloc[-1]
+    ma10 = df['ارزش معاملات'].rolling(window=10).mean().iloc[-1]
+    ma30 = df['ارزش معاملات'].rolling(window=30).mean().iloc[-1]
+    if ma5 > ma10: analysis_points.append("<b>روند کوتاه‌مدت:</b> صعودی ✅ (میانگین ۵ روزه بالای ۱۰ روزه)")
+    else: analysis_points.append("<b>روند کوتاه‌مدت:</b> نزولی ❌ (میانگین ۵ روزه زیر ۱۰ روزه)")
+    if ma10 > ma30: analysis_points.append("<b>روند اصلی:</b> صعودی ✅ (میانگین ۱۰ روزه بالای ۳۰ روزه)")
+    else: analysis_points.append("<b>روند اصلی:</b> نزولی ❌ (میانگین ۱۰ روزه زیر ۳۰ روزه)")
+    return analysis_points
 
 def create_fear_greed_gauge_real_scale(current_value, file_str):
     print(f"\nدر حال ایجاد شاخص ترس و طمع...")
@@ -166,14 +189,16 @@ def create_fear_greed_gauge_real_scale(current_value, file_str):
 
 def clean_text_for_speech(html_text):
     soup = bs_for_clean(html_text, "html.parser")
-    text = soup.get_text()
-    return text
+    return soup.get_text()
 
 async def convert_text_to_speech_async(text, filename="analysis_audio.mp3"):
     """متن را با استفاده از Edge TTS به صورت ناهمگام به فایل صوتی تبدیل می‌کند."""
     print("در حال تبدیل متن به صوت با استفاده از Edge TTS...")
     try:
-        communicate = edge_tts.Communicate(text, "fa-IR-DilaraNeural") # صدای زن
+        # --- راه‌حل: استفاده از یک صدای جایگزین که معمولاً مشکل 401 ندارد ---
+        # صدای مرد فارسی: fa-IR-FaridNeural
+        # صدای زن فارسی: fa-IR-DilaraNeural
+        communicate = edge_tts.Communicate(text, "fa-IR-DilaraNeural")
         await communicate.save(filename)
         print(f"✅ فایل صوتی با موفقیت در '{filename}' ذخیره شد.")
         return filename
@@ -193,10 +218,8 @@ def send_audio_to_telegram(token, chat_id, audio_path, caption=""):
                 api_url, data={'chat_id': chat_id, 'caption': caption, 'parse_mode': 'HTML'},
                 files={'audio': audio_file}, timeout=60)
             response.raise_for_status()
-            if response.json().get("ok"):
-                print("✅ فایل صوتی با موفقیت به تلگرام ارسال شد.")
-            else:
-                print(f"❌ خطا در ارسال فایل صوتی: {response.json()}")
+            if response.json().get("ok"): print("✅ فایل صوتی با موفقیت به تلگرام ارسال شد.")
+            else: print(f"❌ خطا در ارسال فایل صوتی: {response.json()}")
     except Exception as e:
         print(f"خطا در فرآیند ارسال فایل صوتی: {e}")
 
@@ -221,7 +244,7 @@ def main():
         for tr in table.find_all('tr')[1:]:
             tds = tr.find_all('td')
             if len(tds) > 22 and parse_financial_string(tds[2].text) > 0:
-                data.append({"تاریخ": tds[1].text.strip(), 'ارزش معاملات': parse_financial_string(tds[2].text), 'قدرت خريد': parse_financial_string(tds[15].text), 'ورود پول': parse_financial_string(tds[18].text), 'شاخص کل': parse_index_string(tds[21].text), 'شاخص هم‌وزن': parse_index_string(tds[22].text)})
+                data.append({"تاریخ": tds[1].text.strip(), 'ارزش معاملات': parse_financial_string(tds[2].text), 'قدرت خريد': parse_financial_string(tds[15].text), 'قدرت 5 روزه': parse_financial_string(tds[16].text), 'قدرت 20 روزه': parse_financial_string(tds[17].text), 'ورود پول': parse_financial_string(tds[18].text), 'ورود پول 5 روزه': parse_financial_string(tds[19].text), 'ورود پول 20 روزه': parse_financial_string(tds[20].text), 'شاخص کل': parse_index_string(tds[21].text), 'شاخص هم‌وزن': parse_index_string(tds[22].text)})
         print(f"✅ داده‌های {len(data)} روز با موفقیت دریافت شد.")
     except Exception as e: 
         print(f"❌ خطا در دریافت داده: {e}")
@@ -234,7 +257,6 @@ def main():
     df = pd.DataFrame(data).iloc[::-1].reset_index(drop=True)
     last_row, previous_row = df.iloc[-1], df.iloc[-2]
     
-    # ... (بقیه کد بدون تغییر)
     last_value = last_row['ارزش معاملات']
     last_date = last_row['تاریخ']
     
@@ -245,32 +267,71 @@ def main():
         send_photo_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, generated_filename, photo_caption)
         os.remove(generated_filename)
     
-    # --- ساخت پیام داده‌های خام ---
+    # --- ساخت پیام داده‌های خام (با فرمت کامل و صحیح) ---
     full_message_blocks = []
-    block1_parts = ["📈 <b>آمار ارزش معاملات</b>"]
-    change = last_value - previous_row['ارزش معاملات']; percent = (change / previous_row['ارزش معاملات'] * 100) if previous_row['ارزش معاملات'] else 0
-    block1_parts.append(f"• <b>امروز:</b> {last_value:,.1f} میلیارد تومان")
-    block1_parts.append(f"• <b>تغییر روزانه:</b> {abs(change):,.1f} میلیارد تومان {'کاهش' if change < 0 else 'افزایش'} {'⬇️' if change < 0 else '⬆️'} ({percent:+.1f}%)")
+    
+    # Block 1: ارزش معاملات
+    block1_parts = ["📈 <b>تحلیل ارزش معاملات</b>"]
+    change = last_value - previous_row['ارزش معاملات']
+    percent = (change / previous_row['ارزش معاملات'] * 100) if previous_row['ارزش معاملات'] else 0
+    block1_parts.append(f"• <b>مقدار امروز:</b> {last_value:,.1f} میلیارد.ت")
+    block1_parts.append(f"• <b>تغییر روزانه:</b> {abs(change):,.1f} میلیارد.ت {'کاهش' if change < 0 else 'افزایش'} {'⬇️' if change < 0 else '⬆️'} ({percent:+.1f}%)")
+    if len(df) > 30:
+        block1_parts.append("\n<b>میانگین‌های متحرک:</b>")
+        for period in [5, 10, 30]:
+            ma_series = df['ارزش معاملات'].rolling(window=period).mean()
+            current_avg, prev_avg = ma_series.iloc[-1], ma_series.iloc[-2]
+            ma_trend = "⬆️" if current_avg > prev_avg else ("⬇️" if current_avg < prev_avg else "↔️")
+            block1_parts.append(f"  - {period} روزه: <b>{current_avg:,.1f}</b> <i>(دیروز: {prev_avg:,.1f})</i> {ma_trend}")
+        ma_analysis = analyze_moving_averages(df)
+        if ma_analysis: 
+            block1_parts.append("\n" + "🔔 <b>تحلیل تکنیکال (ارزش معاملات):</b>")
+            block1_parts.extend([f"  - {point}" for point in ma_analysis])
     full_message_blocks.append("\n".join(block1_parts))
 
-    block_indices = ["📉 <b>آمار شاخص‌های بازار</b>"]
+    # Block 2: شاخص‌ها
+    block_indices = ["📉 <b>تحلیل شاخص‌های بازار</b>"]
     for name, key in [('کل', 'شاخص کل'), ('هم‌وزن', 'شاخص هم‌وزن')]:
         current_idx, prev_idx = last_row[key], previous_row[key]
         idx_change, idx_percent = current_idx - prev_idx, (current_idx - prev_idx) / prev_idx * 100 if prev_idx else 0
-        block_indices.append(f"⚪️ <b>شاخص {name}:</b> <code>{current_idx:,.0f}</code> ({idx_change:+,.0f} | {idx_percent:+.2f}%) {'⬆️' if idx_change >= 0 else '⬇️'}")
-    full_message_blocks.append("\n".join(block_indices))
+        ath_record_badge = ""
+        if len(df) > 1:
+            previous_ath = df[key][:-1].max()
+            if current_idx > previous_ath: ath_record_badge = " (🚀 <b>رکورد جدید!</b>)"
+            ath_message = f"  - سقف تاریخی: {int(max(current_idx, previous_ath)):,.0f}"
+        else:
+            ath_message = f"  - سقف تاریخی: {current_idx:,.0f}"
+        yearly_subset = df.tail(252)
+        yearly_low = yearly_subset[key].min()
+        previous_yearly_high = yearly_subset[key][:-1].max() if len(yearly_subset) > 1 else yearly_low
+        dist_from_high = (current_idx - previous_yearly_high) / previous_yearly_high * 100 if previous_yearly_high > 0 else 0
+        dist_from_low = (current_idx - yearly_low) / yearly_low * 100 if yearly_low > 0 else 0
+        yearly_high_message = f"📈<code>{int(previous_yearly_high):,.0f}</code> (<b>{dist_from_high:+.1f}%</b>)"
+        if current_idx > previous_yearly_high: yearly_high_message = f"📈<code>{current_idx:,.0f}</code> (<b>رکورد جدید سال!</b>)"
+        yearly_range_message = f"  - بازه یکساله (📉<code>{int(yearly_low):,.0f}</code> (<b>{dist_from_low:+.1f}%</b>) | {yearly_high_message})"
+        idx_parts = [
+            f"⚪️ <b>شاخص {name}</b>" if name == 'کل' else f"⚖️ <b>شاخص {name}</b>",
+            f"  - مقدار فعلی: <code>{current_idx:,.0f}</code>{ath_record_badge} <b>({idx_change:+,.0f} | {idx_percent:+.2f}%)</b> {'⬆️' if idx_change >= 0 else '⬇️'}",
+            ath_message, yearly_range_message
+        ]
+        proximity_alert = generate_proximity_alert(current_idx, previous_yearly_high, yearly_low, "سقف یکساله", "کف یکساله")
+        if proximity_alert: idx_parts.append(proximity_alert)
+        block_indices.append("\n".join(idx_parts))
+    full_message_blocks.append("\n\n".join(block_indices))
     
-    block3_parts = ["📊 <b>آمار تکمیلی</b>"]
-    p_power = last_row['قدرت خريد']
-    p_money = last_row['ورود پول']
-    block3_parts.append(f"{'✅' if p_power >= 1 else '❌'} <b>قدرت خریدار:</b> <b>{p_power:.2f}</b>")
-    block3_parts.append(f"{'🟢' if p_money >= 0 else '🔴'} <b>ورود پول:</b> <b>{p_money:,.1f}</b> میلیارد تومان")
-    full_message_blocks.append("\n".join(block3_parts))
+    # Block 3: آمار تکمیلی
+    block3_parts = ["📊 <b>آمار تکمیلی بازار</b>"]
+    p_power, p_power_prev = last_row['قدرت خريد'], previous_row['قدرت خريد']
+    p_money, p_money_prev = last_row['ورود پول'], previous_row['ورود پول']
+    block3_parts.append(f"{'✅' if p_power >= 1 else '❌'} <b>قدرت خریدار:</b> <b>{p_power:.2f}</b> <i>(دیروز: {p_power_prev:.2f})</i> {'⬆️' if p_power > p_power_prev else '⬇️'}\n" f"    <i>میانگین ۵ روزه:</i>  {last_row['قدرت 5 روزه']:.2f}\n" f"    <i>میانگین ۲۰ روزه:</i> {last_row['قدرت 20 روزه']:.2f}")
+    block3_parts.append(f"{'🟢' if p_money >= 0 else '🔴'} <b>ورود پول:</b> <b>{p_money:,.1f}</b> میلیارد.ت <i>(دیروز: {p_money_prev:,.1f})</i> {'⬆️' if p_money > p_money_prev else '⬇️'}\n" f"    <i>میانگین ۵ روزه:</i>  {last_row['ورود پول 5 روزه']:,.1f}\n" f"    <i>میانگین ۲۰ روزه:</i> {last_row['ورود پول 20 روزه']:,.1f}")
+    full_message_blocks.append("\n\n".join(block3_parts))
     
-    footer_parts = [f"<i>⏳ بروزرسانی: {update_time_str}</i>", f"🔗 منبع: <code>{DATA_SOURCE_URL}</code>", f"🆔 @Data_Bors"]
+    # Footer
+    footer_parts = [f"<i>⏳ بروزرسانی: {update_time_str}</i>", f"🔗 منبع داده‌ها: <code>{DATA_SOURCE_URL}</code>", f"<i>#گزارش_روزانه_بازار</i>", f"🆔 @Data_Bors"]
     full_message_blocks.append("\n".join(footer_parts))
 
-    data_message = ("\n\n" + "-" * 25 + "\n\n").join(filter(None, full_message_blocks))
+    data_message = ("\n\n" + "-" * 35 + "\n\n").join(filter(None, full_message_blocks))
     send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, data_message)
 
     # --- دریافت، ارسال متن و ساخت صوت تحلیل هوش مصنوعی ---

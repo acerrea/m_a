@@ -19,18 +19,15 @@ now = datetime.now()
 now_str_file = f'{now:%Y-%m-%d}'
 update_time_str = f'{now:%Y/%m/%d | %H:%M}'
 DATA_SOURCE_URL = "TradersArena.ir"
-
-# --- خواندن اطلاعات حساس از متغیرهای محیطی ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# --- تنظیم فونت ---
 font_path_bold = "Vazirmatn-FD-ExtraBold.ttf"
 font_path_regular = "Vazirmatn-FD-Regular.ttf"
 
 if not os.path.exists(font_path_bold) or not os.path.exists(font_path_regular):
-    print("هشدار: فایل‌های فونت یافت نشدند! مطمئن شوید در ریشه مخزن قرار دارند.")
+    print("هشدار: فایل‌های فونت یافت نشدند!")
     font_prop_bold = fm.FontProperties()
     font_prop_regular = fm.FontProperties()
 else:
@@ -40,7 +37,6 @@ else:
 def reshape_text(text):
     return get_display(arabic_reshaper.reshape(str(text)))
 
-# ... (تمام توابع send_photo, send_message, parsers, ... اینجا قرار می‌گیرند) ...
 def send_photo_to_telegram(token, chat_id, photo_path, caption=""):
     print("\nدر حال ارسال عکس به تلگرام...")
     if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
@@ -67,46 +63,63 @@ def send_message_to_telegram(token, chat_id, text):
     except Exception as e: print(f"خطا در فرآیند ارسال پیام متنی: {e}")
 
 def get_gemini_analysis(last_row, previous_row, df):
-    print("\nدر حال دریافت تحلیل از هوش مصنوعی Gemini...")
-    if not GEMINI_API_KEY: return "تحلیل هوش مصنوعی به دلیل عدم وجود کلید API در دسترس نیست."
+    print("\nدر حال دریافت دو نسخه تحلیل (با و بدون اعراب) از Gemini...")
+    if not GEMINI_API_KEY: return None, None
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-flash-lite-latest')
         
         prompt = f"""
-        شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. لطفاً داده‌های زیر را که مربوط به امروز و دیروز بازار سهام تهران است، تحلیل کنید.
-        
+        شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. لطفاً داده‌های زیر را تحلیل کرده و دو نسخه از تحلیل را تولید کنید.
+
         **دستورالعمل‌های خروجی:**
-        1.  تحلیل باید حرفه‌ای، عمیق و به زبان فارسی روان باشد.
-        2.  از فرمت HTML تلگرام (<b>, <i>, <code>) برای برجسته‌سازی استفاده کنید.
-        3.  **بسیار مهم: کل متن تحلیل فارسی را به صورت کامل اعراب‌گذاری (Diacritize) کن تا برای تبدیل به صوت آماده باشد. به عنوان مثال، به جای "شاخص کل"، بنویس "شاخِصِ کُلّ".**
+        1.  **نسخه اول (برای نمایش):** یک تحلیل حرفه‌ای به زبان فارسی روان، با استفاده از فرمت HTML تلگرام (<b>, <i>, <code>). این نسخه **نباید** اعراب‌گذاری شده باشد.
+        2.  **نسخه دوم (برای صوت):** دقیقاً همان متن نسخه اول، اما این بار **به طور کامل و دقیق اعراب‌گذاری شده** (Diacritized) برای تبدیل به صوت.
+        3.  بین این دو نسخه، از جداکننده `[---VOICE_TEXT---]` استفاده کن.
 
         **داده‌های کلیدی:**
-        - **تاریخ گزارش:** {last_row['تاریخ']}
-        - **ارزش معاملات خرد امروز:** {last_row['ارزش معاملات']:,.1f} میلیارد تومان (دیروز: {previous_row['ارزش معاملات']:,.1f})
-        - **شاخص کل امروز:** {last_row['شاخص کل']:,.0f} (تغییر: {(last_row['شاخص کل'] - previous_row['شاخص کل']):+,.0f})
-        - **شاخص هم‌وزن امروز:** {last_row['شاخص هم‌وزن']:,.0f} (تغییر: {(last_row['شاخص هم‌وزن'] - previous_row['شاخص هم‌وزن']):+,.0f})
-        - **ورود/خروج پول حقیقی امروز:** {last_row['ورود پول']:,.1f} میلیارد تومان
-        - **قدرت خریدار به فروشنده امروز:** {last_row['قدرت خريد']:.2f}
+        - تاریخ: {last_row['تاریخ']}
+        - ارزش معاملات: {last_row['ارزش معاملات']:,.1f} میلیارد تومان
+        - شاخص کل: {last_row['شاخص کل']:,.0f} (تغییر: {last_row['شاخص کل'] - previous_row['شاخص کل']:+,.0f})
+        - ورود پول: {last_row['ورود پول']:,.1f} میلیارد تومان
+        - قدرت خریدار: {last_row['قدرت خريد']:.2f}
 
-        **ساختار خروجی باید به این شکل باشد (با اعراب‌گذاری کامل):**
-        📝 <b>[عُنوانِ جَذّابِ شُما]</b>
-        [تَحلیلِ جامِعِ شُما]
+        **ساختار خروجی نهایی باید به این شکل باشد:**
+
+        📝 <b>عنوان جذاب شما</b>
+        [تحلیل جامع شما بدون اعراب]
+        🟢 <b>نقاط قوت:</b>
+        - نکته ۱
+        🔴 <b>نقاط ضعف:</b>
+        - نکته ۱
+        💡 <b>جمع‌بندی:</b>
+        [نتیجه‌گیری نهایی شما بدون اعراب]
+        [---VOICE_TEXT---]
+        📝 <b>عُنوانِ جَذّابِ شُما</b>
+        [تَحلیلِ جامِعِ شُما با اِعراب]
         🟢 <b>نُقاطِ قُوَّت:</b>
-        - [نُکتِهِ ۱]
+        - نُکتِهِ ۱
         🔴 <b>نُقاطِ ضَعف:</b>
-        - [نُکتِهِ ۱]
+        - نُکتِهِ ۱
         💡 <b>جَمع‌بَندی:</b>
-        [نَتیجِه‌گیریِ نَهاییِ شُما]
+        [نَتیجِه‌گیریِ نَهاییِ شُما با اِعراب]
         """
         
         response = model.generate_content(prompt)
-        print("✅ تحلیل هوش مصنوعی (با اعراب‌گذاری) با موفقیت دریافت شد.")
-        return response.text
+        full_text = response.text
+        
+        if "[---VOICE_TEXT---]" in full_text:
+            display_text, voice_text = full_text.split("[---VOICE_TEXT---]", 1)
+            print("✅ دو نسخه تحلیل با موفقیت دریافت و جدا شد.")
+            return display_text.strip(), voice_text.strip()
+        else:
+            print("⚠️ هشدار: جداکننده یافت نشد. از متن اصلی برای هر دو استفاده می‌شود.")
+            return full_text.strip(), full_text.strip()
+            
     except Exception as e:
         print(f"❌ خطا در ارتباط با Gemini API: {e}")
-        return "تحلیل هوش مصنوعی در حال حاضر در دسترس نیست."
-        
+        return None, None
+
 def parse_financial_string(s):
     if not isinstance(s, str): return 0.0
     s = s.strip().replace(',', '')
@@ -127,13 +140,11 @@ def generate_proximity_alert(current_value, high_value, low_value, high_label, l
     if high_value > 0 and high_value > current_value:
         dist_from_high = abs((current_value - high_value) / high_value) * 100
         if dist_from_high <= threshold_percent:
-            alert_msg = (f"  ⚠️ <b>هشدار:</b> با فاصله {dist_from_high:.1f}% از <b>{high_label}</b>، "
-                         f"<b>احتمال</b> افزایش ریسک اصلاح و عرضه وجود دارد.")
+            alert_msg = (f"  ⚠️ <b>هشدار:</b> با فاصله {dist_from_high:.1f}% از <b>{high_label}</b>.")
     if low_value > 0 and not alert_msg and current_value > low_value:
         dist_from_low = abs((current_value - low_value) / low_value) * 100
         if dist_from_low <= threshold_percent:
-            alert_msg = (f"  💡 <b>نکته:</b> با فاصله {dist_from_low:.1f}% از <b>{low_label}</b>، "
-                         f"<b>احتمال</b> برگشت بازار و پایان روند نزولی وجود دارد.")
+            alert_msg = (f"  💡 <b>نکته:</b> با فاصله {dist_from_low:.1f}% از <b>{low_label}</b>.")
     return alert_msg
 
 def analyze_moving_averages(df):
@@ -142,10 +153,10 @@ def analyze_moving_averages(df):
     ma5 = df['ارزش معاملات'].rolling(window=5).mean().iloc[-1]
     ma10 = df['ارزش معاملات'].rolling(window=10).mean().iloc[-1]
     ma30 = df['ارزش معاملات'].rolling(window=30).mean().iloc[-1]
-    if ma5 > ma10: analysis_points.append("<b>روند کوتاه‌مدت:</b> صعودی ✅ (میانگین ۵ روزه بالای ۱۰ روزه)")
-    else: analysis_points.append("<b>روند کوتاه‌مدت:</b> نزولی ❌ (میانگین ۵ روزه زیر ۱۰ روزه)")
-    if ma10 > ma30: analysis_points.append("<b>روند اصلی:</b> صعودی ✅ (میانگین ۱۰ روزه بالای ۳۰ روزه)")
-    else: analysis_points.append("<b>روند اصلی:</b> نزولی ❌ (میانگین ۱۰ روزه زیر ۳۰ روزه)")
+    if ma5 > ma10: analysis_points.append("<b>روند کوتاه‌مدت:</b> صعودی ✅")
+    else: analysis_points.append("<b>روند کوتاه‌مدت:</b> نزولی ❌")
+    if ma10 > ma30: analysis_points.append("<b>روند اصلی:</b> صعودی ✅")
+    else: analysis_points.append("<b>روند اصلی:</b> نزولی ❌")
     return analysis_points
 
 def create_fear_greed_gauge_real_scale(current_value, file_str):
@@ -190,7 +201,7 @@ def clean_text_for_speech(html_text):
 async def convert_text_to_speech_async(text, filename="analysis_audio.mp3"):
     print("در حال تبدیل متن به صوت با استفاده از Edge TTS...")
     try:
-        communicate = edge_tts.Communicate(text, "fa-IR-FaridNeural") # صدای مرد
+        communicate = edge_tts.Communicate(text, "fa-IR-FaridNeural")
         await communicate.save(filename)
         print(f"✅ فایل صوتی با موفقیت در '{filename}' ذخیره شد.")
         return filename
@@ -214,7 +225,7 @@ def send_audio_to_telegram(token, chat_id, audio_path, caption=""):
 
 def main():
     if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID]):
-        print("❌ متغیرهای محیطی تلگرام تنظیم نشده‌اند. برنامه متوقف می‌شود."); return
+        print("❌ متغیرهای محیطی تلگرام تنظیم نشده‌اند."); return
 
     print("--- شروع فرآیند تحلیل روزانه بازار ---")
     print("در حال دریافت داده‌ها از TradersArena.ir...")
@@ -246,7 +257,7 @@ def main():
         send_photo_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, generated_filename, photo_caption)
         os.remove(generated_filename)
     
-    # --- ساخت پیام داده‌های خام (با فرمت کامل و صحیح) ---
+    # --- ساخت پیام داده‌های خام (با فرمت کامل) ---
     full_message_blocks = []
     block1_parts = ["📈 <b>تحلیل ارزش معاملات</b>"]
     change = last_value - previous_row['ارزش معاملات']
@@ -265,6 +276,7 @@ def main():
             block1_parts.append("\n" + "🔔 <b>تحلیل تکنیکال (ارزش معاملات):</b>")
             block1_parts.extend([f"  - {point}" for point in ma_analysis])
     full_message_blocks.append("\n".join(block1_parts))
+
     block_indices = ["📉 <b>تحلیل شاخص‌های بازار</b>"]
     for name, key in [('کل', 'شاخص کل'), ('هم‌وزن', 'شاخص هم‌وزن')]:
         current_idx, prev_idx = last_row[key], previous_row[key]
@@ -306,12 +318,14 @@ def main():
     data_message = ("\n\n" + "-" * 35 + "\n\n").join(filter(None, full_message_blocks))
     send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, data_message)
 
-    ai_analysis_html = get_gemini_analysis(last_row, previous_row, df)
-    if ai_analysis_html:
-        ai_message = ai_analysis_html + "\n\n" + "\n".join([f"<i>این تحلیل توسط هوش مصنوعی (Google Gemini) تولید شده است.</i>", "🆔 @Data_Bors"])
+    # --- دریافت، ارسال متن و ساخت صوت تحلیل هوش مصنوعی ---
+    display_analysis_html, voice_analysis_html = get_gemini_analysis(last_row, previous_row, df)
+    
+    if display_analysis_html and voice_analysis_html:
+        ai_message = display_analysis_html + "\n\n" + "\n".join([f"<i>این تحلیل توسط هوش مصنوعی (Google Gemini) تولید شده است.</i>", "🆔 @Data_Bors"])
         send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ai_message)
 
-        text_for_speech_clean = clean_text_for_speech(ai_analysis_html)
+        text_for_speech_clean = clean_text_for_speech(voice_analysis_html)
         audio_filename = asyncio.run(convert_text_to_speech_async(text_for_speech_clean))
         
         if audio_filename and os.path.exists(audio_filename):

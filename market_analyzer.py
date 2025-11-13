@@ -11,8 +11,6 @@ import numpy as np
 import os
 import google.generativeai as genai
 from bs4 import BeautifulSoup as bs_for_clean
-import asyncio
-import edge_tts
 
 # --- تنظیمات اولیه ---
 now = datetime.now()
@@ -37,6 +35,7 @@ else:
 def reshape_text(text):
     return get_display(arabic_reshaper.reshape(str(text)))
 
+# ... (توابع send_photo, send_message, parsers, ... بدون تغییر)
 def send_photo_to_telegram(token, chat_id, photo_path, caption=""):
     print("\nدر حال ارسال عکس به تلگرام...")
     if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
@@ -62,64 +61,54 @@ def send_message_to_telegram(token, chat_id, text):
         else: print(f"❌ خطا در ارسال پیام متنی: {response.json()}")
     except Exception as e: print(f"خطا در فرآیند ارسال پیام متنی: {e}")
 
-def get_gemini_analysis(last_row, previous_row, df):
-    print("\nدر حال دریافت دو نسخه تحلیل (با و بدون اعراب) از Gemini...")
-    if not GEMINI_API_KEY: return None, None
+def get_gemini_analysis_text(last_row, previous_row, df):
+    """فقط تحلیل متنی را از Gemini دریافت می‌کند."""
+    print("\nدر حال دریافت تحلیل متنی از Gemini...")
+    if not GEMINI_API_KEY: return None
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-flash-lite-latest')
+        model = genai.GenerativeModel('gemini-1.5-pro-latest') # استفاده از بهترین مدل برای کیفیت بالا
         
         prompt = f"""
-        شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. لطفاً داده‌های زیر را تحلیل کرده و دو نسخه از تحلیل را تولید کنید.
-
-        **دستورالعمل‌های خروجی:**
-        1.  **نسخه اول (برای نمایش):** یک تحلیل حرفه‌ای به زبان فارسی روان، با استفاده از فرمت HTML تلگرام (<b>, <i>, <code>). این نسخه **نباید** اعراب‌گذاری شده باشد.
-        2.  **نسخه دوم (برای صوت):** دقیقاً همان متن نسخه اول، اما این بار **به طور کامل و دقیق اعراب‌گذاری شده** (Diacritized) برای تبدیل به صوت.
-        3.  بین این دو نسخه، از جداکننده `[---VOICE_TEXT---]` استفاده کن.
-
-        **داده‌های کلیدی:**
+        شما یک تحلیلگر ارشد بازار سرمایه ایران هستید. داده‌های زیر را تحلیل کرده و یک گزارش حرفه‌ای، خوانا و بدون اعراب‌گذاری برای نمایش در تلگرام آماده کن. از فرمت HTML (<b>, <i>, <code>) استفاده کن.
         - تاریخ: {last_row['تاریخ']}
         - ارزش معاملات: {last_row['ارزش معاملات']:,.1f} میلیارد تومان
         - شاخص کل: {last_row['شاخص کل']:,.0f} (تغییر: {last_row['شاخص کل'] - previous_row['شاخص کل']:+,.0f})
         - ورود پول: {last_row['ورود پول']:,.1f} میلیارد تومان
         - قدرت خریدار: {last_row['قدرت خريد']:.2f}
-
-        **ساختار خروجی نهایی باید به این شکل باشد:**
-
-        📝 <b>عنوان جذاب شما</b>
-        [تحلیل جامع شما بدون اعراب]
-        🟢 <b>نقاط قوت:</b>
-        - نکته ۱
-        🔴 <b>نقاط ضعف:</b>
-        - نکته ۱
-        💡 <b>جمع‌بندی:</b>
-        [نتیجه‌گیری نهایی شما بدون اعراب]
-        [---VOICE_TEXT---]
-        📝 <b>عُنوانِ جَذّابِ شُما</b>
-        [تَحلیلِ جامِعِ شُما با اِعراب]
-        🟢 <b>نُقاطِ قُوَّت:</b>
-        - نُکتِهِ ۱
-        🔴 <b>نُقاطِ ضَعف:</b>
-        - نُکتِهِ ۱
-        💡 <b>جَمع‌بَندی:</b>
-        [نَتیجِه‌گیریِ نَهاییِ شُما با اِعراب]
         """
-        
         response = model.generate_content(prompt)
-        full_text = response.text
-        
-        if "[---VOICE_TEXT---]" in full_text:
-            display_text, voice_text = full_text.split("[---VOICE_TEXT---]", 1)
-            print("✅ دو نسخه تحلیل با موفقیت دریافت و جدا شد.")
-            return display_text.strip(), voice_text.strip()
-        else:
-            print("⚠️ هشدار: جداکننده یافت نشد. از متن اصلی برای هر دو استفاده می‌شود.")
-            return full_text.strip(), full_text.strip()
+        print("✅ تحلیل متنی با موفقیت دریافت شد.")
+        return response.text.strip()
             
     except Exception as e:
-        print(f"❌ خطا در ارتباط با Gemini API: {e}")
-        return None, None
+        print(f"❌ خطا در دریافت تحلیل متنی از Gemini: {e}")
+        return None
 
+def convert_text_to_speech_gemini(text, filename="analysis_audio.mp3"):
+    """متن را با استفاده از مدل TTS داخلی Gemini به صوت تبدیل می‌کند."""
+    print("در حال تبدیل متن به صوت با استفاده از Gemini TTS...")
+    if not GEMINI_API_KEY: return None
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        # استفاده از مدل تخصصی متن به صوت گوگل
+        tts_model = genai.GenerativeModel('models/text-to-speech')
+
+        response = tts_model.generate_content(
+            text,
+            voice="fa-IR-Standard-A"  # انتخاب صدای مرد فارسی
+        )
+        
+        with open(filename, "wb") as f:
+            f.write(response.audio_content)
+        
+        print(f"✅ فایل صوتی با موفقیت در '{filename}' ذخیره شد.")
+        return filename
+    except Exception as e:
+        print(f"❌ خطا در تبدیل متن به صوت با Gemini TTS: {e}")
+        return None
+        
+# ... (تمام توابع parse, proximity, moving_average, gauge ... بدون تغییر)
 def parse_financial_string(s):
     if not isinstance(s, str): return 0.0
     s = s.strip().replace(',', '')
@@ -198,17 +187,6 @@ def clean_text_for_speech(html_text):
     soup = bs_for_clean(html_text, "html.parser")
     return soup.get_text()
 
-async def convert_text_to_speech_async(text, filename="analysis_audio.mp3"):
-    print("در حال تبدیل متن به صوت با استفاده از Edge TTS...")
-    try:
-        communicate = edge_tts.Communicate(text, "fa-IR-FaridNeural")
-        await communicate.save(filename)
-        print(f"✅ فایل صوتی با موفقیت در '{filename}' ذخیره شد.")
-        return filename
-    except Exception as e:
-        print(f"❌ خطا در تبدیل متن به صوت: {e}")
-        return None
-
 def send_audio_to_telegram(token, chat_id, audio_path, caption=""):
     print("در حال ارسال فایل صوتی به تلگرام...")
     if not token or not chat_id: print("❌ توکن تلگرام یا آیدی چت تعریف نشده است."); return
@@ -224,10 +202,11 @@ def send_audio_to_telegram(token, chat_id, audio_path, caption=""):
     except Exception as e: print(f"خطا در فرآیند ارسال فایل صوتی: {e}")
 
 def main():
-    if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID]):
-        print("❌ متغیرهای محیطی تلگرام تنظیم نشده‌اند."); return
+    if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GEMINI_API_KEY]):
+        print("❌ یکی از متغیرهای محیطی (تلگرام یا Gemini) تنظیم نشده است."); return
 
     print("--- شروع فرآیند تحلیل روزانه بازار ---")
+    # ... (کد دریافت داده‌ها)
     print("در حال دریافت داده‌ها از TradersArena.ir...")
     data = []
     try:
@@ -248,6 +227,7 @@ def main():
     df = pd.DataFrame(data).iloc[::-1].reset_index(drop=True)
     last_row, previous_row = df.iloc[-1], df.iloc[-2]
     
+    # ... (کد ساخت و ارسال عکس و پیام داده‌ها)
     last_value, last_date = last_row['ارزش معاملات'], last_row['تاریخ']
     
     generated_filename = create_fear_greed_gauge_real_scale(last_value, now_str_file)
@@ -257,31 +237,25 @@ def main():
         send_photo_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, generated_filename, photo_caption)
         os.remove(generated_filename)
     
-    # --- ساخت پیام داده‌های خام (با فرمت کامل) ---
-    full_message_blocks = []
+    full_message_blocks = [] # ... (کد کامل ساخت پیام داده‌ها)
     block1_parts = ["📈 <b>تحلیل ارزش معاملات</b>"]
-    change = last_value - previous_row['ارزش معاملات']
-    percent = (change / previous_row['ارزش معاملات'] * 100) if previous_row['ارزش معاملات'] else 0
-    block1_parts.append(f"• <b>مقدار امروز:</b> {last_value:,.1f} میلیارد.ت")
-    block1_parts.append(f"• <b>تغییر روزانه:</b> {abs(change):,.1f} میلیارد.ت {'کاهش' if change < 0 else 'افزایش'} {'⬇️' if change < 0 else '⬆️'} ({percent:+.1f}%)")
+    change = last_value - previous_row['ارزش معاملات']; percent = (change / previous_row['ارزش معاملات'] * 100) if previous_row['ارزش معاملات'] else 0
+    block1_parts.append(f"• <b>مقدار امروز:</b> {last_value:,.1f} میلیارد.ت"); block1_parts.append(f"• <b>تغییر روزانه:</b> {abs(change):,.1f} میلیارد.ت {'کاهش' if change < 0 else 'افزایش'} {'⬇️' if change < 0 else '⬆️'} ({percent:+.1f}%)")
     if len(df) > 30:
         block1_parts.append("\n<b>میانگین‌های متحرک:</b>")
         for period in [5, 10, 30]:
-            ma_series = df['ارزش معاملات'].rolling(window=period).mean()
-            current_avg, prev_avg = ma_series.iloc[-1], ma_series.iloc[-2]
+            ma_series = df['ارزش معاملات'].rolling(window=period).mean(); current_avg, prev_avg = ma_series.iloc[-1], ma_series.iloc[-2]
             ma_trend = "⬆️" if current_avg > prev_avg else ("⬇️" if current_avg < prev_avg else "↔️")
             block1_parts.append(f"  - {period} روزه: <b>{current_avg:,.1f}</b> <i>(دیروز: {prev_avg:,.1f})</i> {ma_trend}")
         ma_analysis = analyze_moving_averages(df)
-        if ma_analysis: 
-            block1_parts.append("\n" + "🔔 <b>تحلیل تکنیکال (ارزش معاملات):</b>")
-            block1_parts.extend([f"  - {point}" for point in ma_analysis])
+        if ma_analysis: block1_parts.append("\n" + "🔔 <b>تحلیل تکنیکال (ارزش معاملات):</b>"); block1_parts.extend([f"  - {point}" for point in ma_analysis])
     full_message_blocks.append("\n".join(block1_parts))
 
     block_indices = ["📉 <b>تحلیل شاخص‌های بازار</b>"]
     for name, key in [('کل', 'شاخص کل'), ('هم‌وزن', 'شاخص هم‌وزن')]:
         current_idx, prev_idx = last_row[key], previous_row[key]
         idx_change, idx_percent = current_idx - prev_idx, (current_idx - prev_idx) / prev_idx * 100 if prev_idx else 0
-        ath_record_badge = ""
+        ath_record_badge = ""; ath_message = ""
         if len(df) > 1:
             previous_ath = df[key][:-1].max()
             if current_idx > previous_ath: ath_record_badge = " (🚀 <b>رکورد جدید!</b>)"
@@ -306,8 +280,7 @@ def main():
     full_message_blocks.append("\n\n".join(block_indices))
     
     block3_parts = ["📊 <b>آمار تکمیلی بازار</b>"]
-    p_power, p_power_prev = last_row['قدرت خريد'], previous_row['قدرت خريد']
-    p_money, p_money_prev = last_row['ورود پول'], previous_row['ورود پول']
+    p_power, p_power_prev = last_row['قدرت خريد'], previous_row['قدرت خريد']; p_money, p_money_prev = last_row['ورود پول'], previous_row['ورود پول']
     block3_parts.append(f"{'✅' if p_power >= 1 else '❌'} <b>قدرت خریدار:</b> <b>{p_power:.2f}</b> <i>(دیروز: {p_power_prev:.2f})</i> {'⬆️' if p_power > p_power_prev else '⬇️'}\n" f"    <i>میانگین ۵ روزه:</i>  {last_row['قدرت 5 روزه']:.2f}\n" f"    <i>میانگین ۲۰ روزه:</i> {last_row['قدرت 20 روزه']:.2f}")
     block3_parts.append(f"{'🟢' if p_money >= 0 else '🔴'} <b>ورود پول:</b> <b>{p_money:,.1f}</b> میلیارد.ت <i>(دیروز: {p_money_prev:,.1f})</i> {'⬆️' if p_money > p_money_prev else '⬇️'}\n" f"    <i>میانگین ۵ روزه:</i>  {last_row['ورود پول 5 روزه']:,.1f}\n" f"    <i>میانگین ۲۰ روزه:</i> {last_row['ورود پول 20 روزه']:,.1f}")
     full_message_blocks.append("\n\n".join(block3_parts))
@@ -318,19 +291,19 @@ def main():
     data_message = ("\n\n" + "-" * 35 + "\n\n").join(filter(None, full_message_blocks))
     send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, data_message)
 
-    # --- دریافت، ارسال متن و ساخت صوت تحلیل هوش مصنوعی ---
-    display_analysis_html, voice_analysis_html = get_gemini_analysis(last_row, previous_row, df)
+    # --- دریافت متن و سپس تولید صوت ---
+    display_analysis_html = get_gemini_analysis_text(last_row, previous_row, df)
     
-    if display_analysis_html and voice_analysis_html:
+    if display_analysis_html:
         ai_message = display_analysis_html + "\n\n" + "\n".join([f"<i>این تحلیل توسط هوش مصنوعی (Google Gemini) تولید شده است.</i>", "🆔 @Data_Bors"])
         send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ai_message)
 
-        text_for_speech_clean = clean_text_for_speech(voice_analysis_html)
-        audio_filename = asyncio.run(convert_text_to_speech_async(text_for_speech_clean))
+        text_for_speech_clean = clean_text_for_speech(display_analysis_html)
+        audio_filename = convert_text_to_speech_gemini(text_for_speech_clean)
         
         if audio_filename and os.path.exists(audio_filename):
             audio_caption = "🎧 <b>نسخه صوتی تحلیل روز</b>\n\n" \
-                            "<i>(تولید شده با صدای هوش مصنوعی مایکروسافت)</i>\n\n" \
+                            "<i>(تولید شده با صدای هوش مصنوعی گوگل)</i>\n\n" \
                             "🆔 @Data_Bors"
             send_audio_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, audio_filename, audio_caption)
             os.remove(audio_filename)

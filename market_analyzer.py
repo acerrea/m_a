@@ -201,9 +201,11 @@ def clean_text_for_speech(html_text):
     return text
 
 def convert_text_to_speech(text, filename="analysis_audio.mp3"):
+    """متن را به یک فایل صوتی mp3 تبدیل می‌کند."""
     print("در حال تبدیل متن به صوت...")
     try:
-        tts = gTTS(text=text, lang='fa', slow=False)
+        # --- تغییر: اضافه کردن tld='com' ---
+        tts = gTTS(text=text, lang='fa', slow=False, tld='com')
         tts.save(filename)
         print(f"✅ فایل صوتی با موفقیت در '{filename}' ذخیره شد.")
         return filename

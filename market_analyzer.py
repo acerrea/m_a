@@ -75,7 +75,7 @@ def get_gemini_analysis(last_row, previous_row, df):
         return None
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('Gemini-2.5-Flash-Lite') # استفاده از مدل بهینه و سریع
+        model = genai.GenerativeModel('gemini-flash-lite-latest') # استفاده از مدل بهینه و سریع
 
         # ساخت یک متن کامل و ساختاریافته به عنوان ورودی برای هوش مصنوعی
         prompt = f"""

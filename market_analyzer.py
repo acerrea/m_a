@@ -310,7 +310,9 @@ def main():
     generated_filename = create_fear_greed_gauge_real_scale(last_value, now_str_file)
 
     if generated_filename:
-        status_short = "وضعیت: " + ("<b>ترس شدید</b> 🥶" if last_value < 3000 else "<b>ترس</b> 😟" if last_value < 5000 else "<b>خنثی</b> 😐" if last_value < 10000 else "<b>طمع</b> 😊" if last_value < 15000 else "<b>طمع شدید</b> 🤩🔥")
+        # تغییر در اینجا: اضافه شدن شرط برای مقادیر بالای ۲۰ هزار (طمع خیلی شدید)
+        status_short = "وضعیت: " + ("<b>ترس شدید</b> 🥶" if last_value < 3000 else "<b>ترس</b> 😟" if last_value < 5000 else "<b>خنثی</b> 😐" if last_value < 10000 else "<b>طمع</b> 😊" if last_value < 15000 else "<b>طمع شدید</b> 🤩🔥" if last_value < 20000 else "<b>طمع خیلی شدید</b> 🤑🚀")
+        
         photo_caption = "\n".join([f"<b>📊 شاخص ترس و طمع بازار سهام</b>", f"🗓️ تاریخ: {last_date}", f"<b>مقدار فعلی:</b> {last_value:,.1f} میلیارد تومان", status_short, "\n🆔 @Data_Bors"])
         send_photo_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, generated_filename, photo_caption)
 

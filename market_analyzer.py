@@ -317,7 +317,6 @@ def main():
     generated_filename = create_fear_greed_gauge_real_scale(last_value, now_str_file)
 
     if generated_filename:
-        # تغییر در اینجا: اضافه شدن شرط برای مقادیر بالای ۲۰ هزار (طمع خیلی شدید)
         status_short = "وضعیت: " + ("<b>ترس شدید</b> 🥶" if last_value < 3000 else "<b>ترس</b> 😟" if last_value < 5000 else "<b>خنثی</b> 😐" if last_value < 10000 else "<b>طمع</b> 😊" if last_value < 15000 else "<b>طمع شدید</b> 🤩🔥" if last_value < 20000 else "<b>طمع خیلی شدید</b> 🤑🚀")
         
         photo_caption = "\n".join([f"<b>📊 شاخص ترس و طمع بازار سهام</b>", f"🗓️ تاریخ: {last_date}", f"<b>مقدار فعلی:</b> {last_value:,.1f} میلیارد تومان", status_short, "\n🆔 @Data_Bors"])
@@ -325,8 +324,17 @@ def main():
 
         full_message_blocks = []
         block1_parts = ["📈 <b>تحلیل ارزش معاملات</b>"]
+        
+        # --- اضافه کردن تشخیص رکورد ارزش معاملات ---
+        val_record_badge = ""
+        if len(df) > 1:
+            prev_max_val = df['ارزش معاملات'][:-1].max()
+            if last_value > prev_max_val:
+                val_record_badge = " (🚀 <b>رکورد جدید!</b>)"
+        # ---------------------------------------------
+        
         change = last_value - previous_row['ارزش معاملات']; percent = (change / previous_row['ارزش معاملات'] * 100) if previous_row['ارزش معاملات'] else 0
-        block1_parts.append(f"• <b>مقدار امروز:</b> {last_value:,.1f} میلیارد.ت"); block1_parts.append(f"• <b>تغییر روزانه:</b> {abs(change):,.1f} میلیارد.ت {'کاهش' if change < 0 else 'افزایش'} {'⬇️' if change < 0 else '⬆️'} ({percent:+.1f}%)")
+        block1_parts.append(f"• <b>مقدار امروز:</b> {last_value:,.1f} میلیارد.ت{val_record_badge}"); block1_parts.append(f"• <b>تغییر روزانه:</b> {abs(change):,.1f} میلیارد.ت {'کاهش' if change < 0 else 'افزایش'} {'⬇️' if change < 0 else '⬆️'} ({percent:+.1f}%)")
         if len(df) > 30:
             block1_parts.append("\n<b>میانگین‌های متحرک:</b>")
             for period in [5, 10, 30]:

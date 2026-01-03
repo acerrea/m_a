@@ -111,7 +111,7 @@ def get_gemini_analysis(last_row, previous_row, df):
         return None
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-flash-lite-latest') 
+        model = genai.GenerativeModel('gemini-3-flash-preview') 
 
         # --- محاسبات کمکی ---
         money_current = last_row['ورود پول']

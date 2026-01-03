@@ -395,6 +395,7 @@ def main():
         data_message = ("\n\n" + "-" * 35 + "\n\n").join(filter(None, full_message_blocks))
         send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, data_message)
 
+        # --- بخش تحلیل هوش مصنوعی با متن عدم مسئولیت ---
         ai_analysis = get_gemini_analysis(last_row, previous_row, df)
         if ai_analysis:
             disclaimer = (
@@ -402,11 +403,13 @@ def main():
                 "بازارهای مالی همواره با ریسک همراه هستند؛ لذا این گزارش نباید مبنای مستقیم خرید یا فروش قرار گیرد "
                 "و این کانال هیچ‌گونه مسئولیتی در قبال سود یا ضرر کاربران عزیز ندارد."
             )
-            ai_message = ai_analysis + "\n\n" + "\n".join([f"<i>این تحلیل توسط هوش مصنوعی (Google Gemini) تولید شده است.</i>", "🆔 @Data_Bors"])
-            # اینجا تابع اصلاح شده استفاده می‌شود که متن طولانی را مدیریت می‌کند
+            
+            ai_message = ai_analysis + "\n\n" + "\n".join([
+                f"<i>🤖 این تحلیل توسط هوش مصنوعی تولید شده است.</i>",
+                disclaimer,
+                "🆔 @Data_Bors"
+            ])
             send_message_to_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ai_message)
-
-    print(f"\n--- عملیات با موفقیت به پایان رسید. ---")
 
 if __name__ == "__main__":
     main()
